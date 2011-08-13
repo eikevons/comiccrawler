@@ -1,0 +1,274 @@
+#!/usr/bin/env python
+
+from PyQt4 import QtCore, QtGui
+
+import comiccrawler
+
+
+
+class ImageWidget(QtGui.QScrollArea):
+    def __init__(self):
+        super(ImageWidget, self).__init__()
+
+        self.image = QtGui.QLabel()
+        self.image.setBackgroundRole(QtGui.QPalette.Base)
+        self.image.setAlignment(QtCore.Qt.AlignCenter)
+        self.image.setSizePolicy(QtGui.QSizePolicy.Ignored,
+                                 QtGui.QSizePolicy.Ignored)
+        self.image.setScaledContents(True)
+
+        self.setBackgroundRole(QtGui.QPalette.Dark)
+        self.setWidget(self.image)
+        self.setAlignment(QtCore.Qt.AlignCenter)
+        self.setWidgetResizable(False)
+
+        self._zoom_level = 1.0
+
+    def resizeEvent(self, evt):
+        super(ImageWidget, self).resizeEvent(evt)
+        self.image.resize(self.zoom_level * self.image.pixmap().size())
+
+    def set_image(self, image):
+        if isinstance(image, basestring):
+            image = QtGui.QPixmap(image)
+
+        self.image.setPixmap(image)
+        self.image.resize(self.zoom_level * self.image.pixmap().size())
+
+    def set_zoom_level(self, level):
+        self._zoom_level = level
+        if self.image.pixmap():
+            self.image.resize(self.zoom_level * self.image.pixmap().size())
+
+    def get_zoom_level(self):
+        if self._zoom_level != "fit":
+            return self._zoom_level
+
+        w = self.image.pixmap().width()
+        h = self.image.pixmap().height()
+        img_aspect = 1.0 * w / h
+
+        W = self.viewport().width()
+        H = self.viewport().height()
+        label_aspect = 1.0 * W / H
+
+        same_aspect = ((label_aspect - 1.0) * (img_aspect - 1.0) > 0.0) > 0
+        if same_aspect:
+            # Fit to width
+            if img_aspect > label_aspect and W < w:
+                # print "A fit to width"
+                return 1.0 * W/w
+            elif img_aspect <= label_aspect and H < h:
+                # print "A fit to height"
+                return 1.0 * H/h
+        else:
+            if img_aspect > label_aspect and W < w:
+                # print "B fit to width"
+                return 1.0 * W/w
+            elif img_aspect <= label_aspect and H < h:
+                # print "B fit to height"
+                return 1.0 * H/h
+        return 1.0
+
+    zoom_level = property(get_zoom_level, set_zoom_level)
+
+
+
+class ImageViewer(QtGui.QMainWindow):
+    def __init__(self, stripsites):
+        super(ImageViewer, self).__init__()
+
+        self.stripsites = stripsites
+        self.comic = None
+
+        self.current_img = ImageWidget()
+
+        self.next_img = QtGui.QLabel()
+        self.next_img.setAlignment(QtCore.Qt.AlignCenter)
+        self.prev_img = QtGui.QLabel()
+        self.prev_img.setAlignment(QtCore.Qt.AlignCenter)
+
+        vbox = QtGui.QVBoxLayout()
+        vbox.addWidget(self.current_img)
+        vbox.setAlignment(QtCore.Qt.AlignCenter)
+
+        hbox = QtGui.QHBoxLayout()
+        hbox.addWidget(self.prev_img)
+        hbox.addWidget(self.next_img)
+        vbox.addLayout(hbox)
+
+        main = QtGui.QWidget()
+        main.setLayout(vbox)
+        self.setCentralWidget(main)
+
+        self.setWindowTitle("Comic Viewer")
+
+        self._init_actions()
+        self._init_menu()
+
+        self.update_images()
+
+    def _init_actions(self):
+        self.actions = {}
+
+        act = QtGui.QAction(QtGui.QIcon.fromTheme("exit"), "Exit", self)
+        act.setShortcut("Ctrl+Q")
+        act.setStatusTip("Exit application")
+        self.connect(act, QtCore.SIGNAL("triggered()"), QtCore.SLOT("close()"))
+        self.actions["exit"] = act
+
+        # Comic actions
+        act = QtGui.QAction(QtGui.QIcon.fromTheme("prev"), "Previous", self)
+        act.setShortcut("PgUp")
+        act.setStatusTip("Show previous strip")
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.previous_strip)
+        self.actions["strip previous"] = act
+
+        act = QtGui.QAction(QtGui.QIcon.fromTheme("next"), "Next", self)
+        act.setShortcut("PgDown")
+        act.setStatusTip("Show next strip")
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.next_strip)
+        self.actions["strip next"] = act
+
+        # Zoom actions
+        act = QtGui.QAction("Zoom in", self)
+        # zoomin.setShortcut("Ctrl++")
+        # zoomin.setShortcut("+")
+        act.setShortcut("=")
+        # act.setEnabled(False)
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.zoom_in)
+        self.actions["zoom in"] = act
+
+        act = QtGui.QAction("Zoom out", self)
+        act.setShortcut("-")
+        # act.setEnabled(False)
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.zoom_out)
+        self.actions["zoom out"] = act
+
+        act = QtGui.QAction("Fit image", self)
+        act.setShortcut("x")
+        act.setCheckable(True)
+        act.setChecked(True)
+        self.current_img.zoom_level = "fit"
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.zoom_fit)
+        self.actions["zoom fit"] = act
+
+        # List with comics
+        group = QtGui.QActionGroup(self)
+        group.setExclusive(True)
+        first = None
+        for site in self.stripsites:
+            act = group.addAction(QtCore.QString(site.comicname))
+            act.setCheckable(True)
+            self.connect(act, QtCore.SIGNAL("triggered()"), lambda: self.change_comic(site))
+            if first is None:
+                act.setChecked(True)
+                first = site
+        self.actions["comic group"] = group
+        self.change_comic(first)
+
+    def _init_menu(self):
+        QtGui.QIcon.setThemeName("Wasp")
+        menubar = self.menuBar()
+
+        # Comic menu
+        mi = menubar.addMenu("&Comic")
+        mi.addAction(self.actions["strip previous"])
+        mi.addAction(self.actions["strip next"])
+        mi.addSeparator()
+        for act in self.actions["comic group"].actions():
+            mi.addAction(act)
+        mi.addSeparator()
+        mi.addAction(self.actions["exit"])
+
+        # Zoom menu
+        mi = menubar.addMenu("&Zoom")
+        mi.addAction(self.actions["zoom in"])
+        mi.addAction(self.actions["zoom out"])
+        mi.addAction(self.actions["zoom fit"])
+
+    def on_aboutToQuit(self):
+        # Dump the current comic's index.
+        self.comic.dump_index()
+
+    def next_strip(self):
+        try:
+            self.comic.go("next")
+            self.update_images()
+        except comiccrawler.StripError:
+            print "No next comic"
+
+    def previous_strip(self):
+        try:
+            self.comic.go("prev")
+            self.update_images()
+        except comiccrawler.StripError:
+            print "No prev comic"
+
+    def change_comic(self, newstrip):
+        if self.comic is not None and len(self.comic) > 0:
+            print "Dumping old strip"
+            self.comic.dump_index()
+
+        print "Choosing new strip", newstrip
+        if self.comic is None or newstrip != self.comic.stripsite:
+            self.comic = comiccrawler.ComicCrawler(newstrip)
+            try:
+                self.comic.load_index()
+            except IOError:
+                print "Failed to load index."
+            self.update_images()
+
+    def update_images(self):
+        current_strip = self.comic.get()
+        self.current_img.set_image(self.comic.get_image(current_strip))
+
+        try:
+            t = self.comic.get(-1)
+            self.prev_img.setPixmap(QtGui.QPixmap(self.comic.get_image(t)).scaledToHeight(100))
+        except comiccrawler.StripError, e:
+            print current_strip.url
+            print e
+            self.prev_img.clear()
+
+        try:
+            t = self.comic.get(+1)
+            self.next_img.setPixmap(QtGui.QPixmap(self.comic.get_image(t)).scaledToHeight(100))
+        except comiccrawler.StripError, e:
+            print current_strip.url
+            print e
+            self.next_img.clear()
+
+    def zoom_in(self):
+        print "zoom_in"
+        self.current_img.zoom_level *= 1.3
+        self.actions["zoom fit"].setChecked(False)
+
+    def zoom_out(self):
+        print "zoom_out"
+        self.current_img.zoom_level /= 1.3
+        self.actions["zoom fit"].setChecked(False)
+
+    def zoom_fit(self):
+        if self.actions["zoom fit"].isChecked():
+            self.current_img.zoom_level = "fit"
+            # self.actions["zoom in"].setEnabled(False)
+            # self.actions["zoom out"].setEnabled(False)
+        else:
+            # Copy the numerical zoom level
+            self.current_img.zoom_level = self.current_img.zoom_level
+            # self.actions["zoom in"].setEnabled(True)
+            # self.actions["zoom out"].setEnabled(True)
+
+
+
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtGui.QApplication(sys.argv)
+    iv = ImageViewer(comiccrawler.comics)
+    app.connect(app, QtCore.SIGNAL("aboutToQuit()"), iv.on_aboutToQuit)
+
+    iv.show()
+    sys.exit(app.exec_())
