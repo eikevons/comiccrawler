@@ -18,6 +18,7 @@ class TerminusSite(object):
 class ParsingError(StandardError):
     pass
 
+
 class StripError(StandardError):
     pass
 
@@ -31,6 +32,9 @@ class StripSiteBase(object):
         self.img = imgurl
         self.prev = prevurl
         self.next = nexturl
+
+    def __str__(self):
+        return "<%s %s>" % (self.comicname, self.url)
 
     @classmethod
     def mkFromResponse(cls, resp):
@@ -92,7 +96,7 @@ class XKCD(StripSiteBase):
         elif len(prevs) != 2:
             raise ParsingError("%s: Number of prev links != 2" % cls.__name__)
         else:
-            prev = cls._absolute_url(resp.geturl(), prevs[0])
+            prev = cls._absolute_url(resp.geturl(), anchor=prevs[0])
 
         nexts = tree.findAll(lambda tag: tag.name == "a" and tag.text == "Next &gt;")
         if len(nexts) == 0:
@@ -100,7 +104,10 @@ class XKCD(StripSiteBase):
         elif len(nexts) != 2:
             raise ParsingError("%s: Number of next links != 2" % cls.__name__)
         else:
-            next = cls._absolute_url(resp.geturl(), nexts[0])
+            next = cls._absolute_url(resp.geturl(), anchor=nexts[0])
+            # Exclude wronglye recognized `next` links.
+            if next == (resp.geturl() + "#"):
+                next = None
 
         return cls(resp.geturl(), imgurl, prev, next)
 
@@ -177,6 +184,9 @@ class ComicCrawler(dict):
         if not self.has_key(url):
             self.update_strip(url)
         return super(ComicCrawler, self).__getitem__(url)
+
+    def __str__(self):
+        return "<ComicCrawler for %s %d entries>" % (self.stripsite.__name__, len(self))
 
     def update_strip(self, url):
         print "Loading", url
@@ -258,7 +268,7 @@ class ComicCrawler(dict):
         self._current_url = data[0][0]
         for i, (stripurl, imgurl) in enumerate(data[1:-1]):
             i += 1
-            strip = self.stripsite(stripurl, imgurl, data[i-1][0], data[i+1][0])
+            strip = self.stripsite(stripurl, imgurl, data[i+1][0], data[i-1][0])
             self._add_strip(strip)
         strip = self.stripsite(data[-1][0], data[-1][1], TerminusSite, data[-2][0])
         self._add_strip(strip)
@@ -282,8 +292,8 @@ class ComicCrawler(dict):
                 strip = self[strip.prev]
 
 
-if __name__ == "__main__":
-    br = mechanize.Browser()
-    resp = br.open(Dilbert.baseurl)
-    ds = Dilbert.mkFromResponse(resp)
+# if __name__ == "__main__":
+    # br = mechanize.Browser()
+    # resp = br.open(Dilbert.baseurl)
+    # ds = Dilbert.mkFromResponse(resp)
 

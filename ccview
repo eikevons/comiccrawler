@@ -154,18 +154,21 @@ class ImageViewer(QtGui.QMainWindow):
         self.actions["zoom fit"] = act
 
         # List with comics
-        group = QtGui.QActionGroup(self)
-        group.setExclusive(True)
-        first = None
+        group = QtGui.QActionGroup(self, exclusive=True, triggered=self.change_comic)
+        # group.setExclusive(True)
+        first = True
         for site in self.stripsites:
             act = group.addAction(QtCore.QString(site.comicname))
             act.setCheckable(True)
-            self.connect(act, QtCore.SIGNAL("triggered()"), lambda: self.change_comic(site))
-            if first is None:
+            # self.connect(act, QtCore.SIGNAL("triggered()"), lambda: self.change_comic(site))
+            if first:
                 act.setChecked(True)
-                first = site
+                first = False
+                # first = site
         self.actions["comic group"] = group
-        self.change_comic(first)
+        # self.connect(group, QtCore.SIGNAL("triggered()"), self.change_comic)
+        # self.change_comic(first)
+        self.change_comic()
 
     def _init_menu(self):
         QtGui.QIcon.setThemeName("Wasp")
@@ -205,18 +208,30 @@ class ImageViewer(QtGui.QMainWindow):
         except comiccrawler.StripError:
             print "No prev comic"
 
-    def change_comic(self, newstrip):
+    def change_comic(self, action=None):
+        if action is None:
+            newstrip = self.stripsites[0]
+        else:
+            group = self.actions["comic group"]
+            comicname = str(group.checkedAction().text())
+            for newstrip in self.stripsites:
+                if newstrip.comicname == comicname:
+                    break
+            if newstrip.comicname != comicname:
+                print comicname, "not found!"
+
         if self.comic is not None and len(self.comic) > 0:
-            print "Dumping old strip"
             self.comic.dump_index()
 
-        print "Choosing new strip", newstrip
-        if self.comic is None or newstrip != self.comic.stripsite:
+        if self.comic is None or self.comic.stripsite != newstrip:
+            print "Choosing new strip", newstrip
             self.comic = comiccrawler.ComicCrawler(newstrip)
             try:
                 self.comic.load_index()
-            except IOError:
-                print "Failed to load index."
+            except IOError, err:
+                print "Failed to load index:", err
+            except IndexError, err:
+                print "Failed to load index:", err
             self.update_images()
 
     def update_images(self):
