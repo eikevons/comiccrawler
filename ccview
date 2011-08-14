@@ -35,12 +35,8 @@ class ImageWidget(QtGui.QScrollArea):
         self.image.setPixmap(image)
         self.image.resize(self.zoom_level * self.image.pixmap().size())
 
-    def set_zoom_level(self, level):
-        self._zoom_level = level
-        if self.image.pixmap():
-            self.image.resize(self.zoom_level * self.image.pixmap().size())
-
-    def get_zoom_level(self):
+    @property
+    def zoom_level(self):
         if self._zoom_level != "fit":
             return self._zoom_level
 
@@ -70,7 +66,17 @@ class ImageWidget(QtGui.QScrollArea):
                 return 1.0 * H/h
         return 1.0
 
-    zoom_level = property(get_zoom_level, set_zoom_level)
+    @zoom_level.setter
+    def zoom_level(self, level):
+        self._zoom_level = level
+        if self.image.pixmap():
+            self.image.resize(self.zoom_level * self.image.pixmap().size())
+
+    # zoom_level = property(get_zoom_level, set_zoom_level)
+
+    @property
+    def pixmap(self):
+        return self.image.pixmap()
 
 
 
@@ -237,6 +243,11 @@ class ImageViewer(QtGui.QMainWindow):
     def update_images(self):
         current_strip = self.comic.get()
         self.current_img.set_image(self.comic.get_image(current_strip))
+        self.setWindowIcon(QtGui.QIcon(self.current_img.pixmap))
+        if current_strip.title:
+            self.setWindowTitle(current_strip.title)
+        else:
+            self.setWindowTitle(current_strip.url)
 
         try:
             t = self.comic.get(-1)

@@ -27,11 +27,12 @@ class StripSiteBase(object):
     comicname = NotImplemented
     baseurl = NotImplemented
 
-    def __init__(self, siteurl, imgurl, prevurl, nexturl):
+    def __init__(self, siteurl, imgurl, prevurl, nexturl, title=None):
         self.url = siteurl
         self.img = imgurl
         self.prev = prevurl
         self.next = nexturl
+        self.title = title
 
     def __str__(self):
         return "<%s %s>" % (self.comicname, self.url)
@@ -84,6 +85,7 @@ class XKCD(StripSiteBase):
     @classmethod
     def mkFromResponse(cls, resp):
         tree = BeautifulSoup(resp.get_data())
+        title = tree.find("title").text
         imgs = tree.findAll("img", attrs={"src" : cls.comic_src_re})
         if len(imgs) != 1:
             raise ParsingError("%s: Unexpected number of comic <img>s found" % cls.__name__)
@@ -109,7 +111,7 @@ class XKCD(StripSiteBase):
             if next == (resp.geturl() + "#"):
                 next = None
 
-        return cls(resp.geturl(), imgurl, prev, next)
+        return cls(resp.geturl(), imgurl, prev, next, title)
 
     @property
     def savename(self):
@@ -160,6 +162,19 @@ class Dilbert(StripSiteBase):
 
 
 comics = [Dilbert, XKCD, IncidentalComics]
+
+
+class SafeTokenizer(object):
+    def __init__(self, line, sep):
+        self._tokens = line.split(sep)
+
+    def __getitem__(self, idx):
+        if idx < 0:
+            raise ValueError("Only positive indices allowed")
+        try:
+            return self._tokens[idx]
+        except IndexError:
+            return None
 
 
 # { absolute_url => StripSiteBase object }
@@ -264,15 +279,16 @@ class ComicCrawler(dict):
         if infile is None:
             infile = self.indexpath
         with open(infile, "r") as f:
-            data = [line.strip().split(sep) for line in f]
-        strip = self.stripsite(data[0][0], data[0][1], data[1][0], TerminusSite)
+            # data = [line.strip().split(sep) for line in f]
+            data = [SafeTokenizer(line.strip(), sep) for line in f]
+        strip = self.stripsite(data[0][0], data[0][1], data[1][0], TerminusSite, data[0][2])
         self._add_strip(strip)
         self._current_url = data[0][0]
-        for i, (stripurl, imgurl) in enumerate(data[1:-1]):
+        for i, toks in enumerate(data[1:-1]):
             i += 1
-            strip = self.stripsite(stripurl, imgurl, data[i+1][0], data[i-1][0])
+            strip = self.stripsite(toks[0], toks[1], data[i+1][0], data[i-1][0], toks[2])
             self._add_strip(strip)
-        strip = self.stripsite(data[-1][0], data[-1][1], TerminusSite, data[-2][0])
+        strip = self.stripsite(data[-1][0], data[-1][1], TerminusSite, data[-2][0], data[-1][2])
         self._add_strip(strip)
 
     def dump_index(self, outfile=None, sep="\t"):
@@ -288,6 +304,9 @@ class ComicCrawler(dict):
                 f.write(strip.url)
                 f.write(sep)
                 f.write(strip.img)
+                if strip.title:
+                    f.write(sep)
+                    f.write(strip.title)
                 f.write("\n")
                 if strip.prev is None or not self.has_key(strip.prev):
                     break
