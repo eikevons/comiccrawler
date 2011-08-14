@@ -131,6 +131,8 @@ class Dilbert(StripSiteBase):
         imgs = div.findChildren("img")
         if len(imgs) != 1:
             raise ParsingError("%s: Unexpected number of comic <img>s found" % (cls.__name__))
+        elif "coming_soon" in imgs[0]["src"]:
+            raise StripError("%s: No strip image in %s" % (cls.__name__, resp.geturl()))
         imgurl = cls._absolute_url(resp.geturl(), img=imgs[0])
 
         div = tree.findAll("div", attrs={"class":"STR_Calendar"})
@@ -160,7 +162,7 @@ class Dilbert(StripSiteBase):
 comics = [Dilbert, XKCD, IncidentalComics]
 
 
-# { absolute_url => StripSite object }
+# { absolute_url => StripSiteBase object }
 
 class ComicCrawler(dict):
     """Crawler for comic strip sites.
