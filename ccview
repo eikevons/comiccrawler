@@ -79,6 +79,13 @@ class ImageWidget(QtGui.QScrollArea):
         return self.image.pixmap()
 
 
+class ClickableLabel(QtGui.QLabel):
+    def mouseReleaseEvent(self, ev):
+        print ev
+        print dir(ev)
+        self.emit(QtCore.SIGNAL("clicked()"))
+
+
 
 class ImageViewer(QtGui.QMainWindow):
     def __init__(self, stripsites):
@@ -89,9 +96,11 @@ class ImageViewer(QtGui.QMainWindow):
 
         self.current_img = ImageWidget()
 
-        self.next_img = QtGui.QLabel()
+        # self.next_img = QtGui.QLabel()
+        self.next_img = ClickableLabel()
         self.next_img.setAlignment(QtCore.Qt.AlignCenter)
-        self.prev_img = QtGui.QLabel()
+        # self.prev_img = QtGui.QLabel()
+        self.prev_img = ClickableLabel()
         self.prev_img.setAlignment(QtCore.Qt.AlignCenter)
 
         vbox = QtGui.QVBoxLayout()
@@ -123,6 +132,10 @@ class ImageViewer(QtGui.QMainWindow):
         self.connect(act, QtCore.SIGNAL("triggered()"), QtCore.SLOT("close()"))
         self.actions["exit"] = act
 
+        # Label actions
+        self.connect(self.prev_img, QtCore.SIGNAL("clicked()"), self.previous_strip)
+        self.connect(self.next_img, QtCore.SIGNAL("clicked()"), self.next_strip)
+
         # Comic actions
         act = QtGui.QAction(QtGui.QIcon.fromTheme("prev"), "Previous", self)
         act.setShortcut("PgUp")
@@ -135,6 +148,18 @@ class ImageViewer(QtGui.QMainWindow):
         act.setStatusTip("Show next strip")
         self.connect(act, QtCore.SIGNAL("triggered()"), self.next_strip)
         self.actions["strip next"] = act
+
+        act = QtGui.QAction(QtGui.QIcon.fromTheme("first"), "First", self)
+        act.setShortcut("Home")
+        act.setStatusTip("Show first downloaded strip")
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.first_strip)
+        self.actions["strip first"] = act
+
+        act = QtGui.QAction(QtGui.QIcon.fromTheme("last"), "Last", self)
+        act.setShortcut("End")
+        act.setStatusTip("Show last downloaded strip")
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.last_strip)
+        self.actions["strip last"] = act
 
         # Zoom actions
         act = QtGui.QAction("Zoom in", self)
@@ -184,6 +209,8 @@ class ImageViewer(QtGui.QMainWindow):
         mi = menubar.addMenu("&Comic")
         mi.addAction(self.actions["strip previous"])
         mi.addAction(self.actions["strip next"])
+        mi.addAction(self.actions["strip first"])
+        mi.addAction(self.actions["strip last"])
         mi.addSeparator()
         for act in self.actions["comic group"].actions():
             mi.addAction(act)
@@ -213,6 +240,22 @@ class ImageViewer(QtGui.QMainWindow):
             self.update_images()
         except comiccrawler.StripError:
             print "No prev comic"
+
+    def first_strip(self):
+        while True:
+            try:
+                self.comic.go("prev", False)
+            except comiccrawler.StripError:
+                break
+        self.update_images()
+
+    def last_strip(self):
+        while True:
+            try:
+                self.comic.go("next", False)
+            except comiccrawler.StripError:
+                break
+        self.update_images()
 
     def change_comic(self, action=None):
         if action is None:

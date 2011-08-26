@@ -23,6 +23,7 @@ class StripError(StandardError):
     pass
 
 
+
 class StripSiteBase(object):
     comicname = NotImplemented
     baseurl = NotImplemented
@@ -53,7 +54,6 @@ class StripSiteBase(object):
             return mechanize.Link(base, anchor["href"], anchor.text, "a", anchor.attrMap).absolute_url
         elif img is not None:
             return mechanize.Link(base, img["src"], img.text, "img", img.attrMap).absolute_url
-
 
 
 class IncidentalComics(StripSiteBase):
@@ -211,37 +211,49 @@ class ComicCrawler(dict):
         strip = self.stripsite.mkFromResponse(resp)
         self._add_strip(strip)
 
-    def go(self, direction):
+    def go(self, direction, reload=True):
         """Move to the next/prev strip."""
         if direction == "next":
-            site = self.get(1)
+            site = self.get(1, reload)
         elif direction == "prev":
-            site = self.get(-1)
+            site = self.get(-1, reload)
         else:
             raise ValueError("direction must be 'prev' or 'next'")
         self._current_url = site.url
 
-    def get(self, dist=0):
+    # TODO: This is not working well with ImageViewer.{first,last}_strip
+    def get(self, dist=0, reload=True):
         """Get a strip `dist` clicks away from current strip.
+
+        If `reload` is ``True`` refetch the intermediate sites if necessary.
         """
         t = self[self._current_url]
         while dist != 0:
             if dist > 0:
                 if t.next is TerminusSite:
                     print "next == TerminusSite  => reloading"
-                    self.update_strip(self._current_url)
-                    t = self[self._current_url]
+                    self.update_strip(t.url)
+                    t = self[t.url]
                 if t.next is None:
                     raise StripError("No next site")
+
+                if not reload and not self.has_key(t.next):
+                    raise StripError("Next strip not loaded")
+
                 t = self[t.next]
                 dist -= 1
+
             elif dist < 0:
                 if t.prev is TerminusSite:
                     print "prev == TerminusSite  => reloading"
-                    self.update_strip(self._current_url)
-                    t = self[self._current_url]
+                    self.update_strip(t.url)
+                    t = self[t.url]
                 if t.prev is None:
                     raise StripError("No prev site")
+
+                if not reload and not self.has_key(t.prev):
+                    raise StripError("Previous strip not loaded")
+
                 t = self[t.prev]
                 dist += 1
         return t
