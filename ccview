@@ -79,10 +79,11 @@ class ImageWidget(QtGui.QScrollArea):
         return self.image.pixmap()
 
 
+
 class ClickableLabel(QtGui.QLabel):
     def mouseReleaseEvent(self, ev):
-        print ev
-        print dir(ev)
+        # print ev
+        # print dir(ev)
         self.emit(QtCore.SIGNAL("clicked()"))
 
 
@@ -246,6 +247,9 @@ class ImageViewer(QtGui.QMainWindow):
             try:
                 self.comic.go("prev", False)
             except comiccrawler.StripError:
+                # The first viewed strip is the second-to-first downloaded
+                # strip because of the preview window.
+                self.comic.go("next", False)
                 break
         self.update_images()
 
@@ -285,6 +289,7 @@ class ImageViewer(QtGui.QMainWindow):
 
     def update_images(self):
         current_strip = self.comic.get()
+        print "Current strip", current_strip
         self.current_img.set_image(self.comic.get_image(current_strip))
         self.setWindowIcon(QtGui.QIcon(self.current_img.pixmap))
         if current_strip.title:
@@ -296,25 +301,25 @@ class ImageViewer(QtGui.QMainWindow):
             t = self.comic.get(-1)
             self.prev_img.setPixmap(QtGui.QPixmap(self.comic.get_image(t)).scaledToHeight(100))
         except comiccrawler.StripError, e:
-            print current_strip.url
-            print e
+            # print current_strip.url
+            # print e
             self.prev_img.clear()
 
         try:
             t = self.comic.get(+1)
             self.next_img.setPixmap(QtGui.QPixmap(self.comic.get_image(t)).scaledToHeight(100))
         except comiccrawler.StripError, e:
-            print current_strip.url
-            print e
+            # print current_strip.url
+            # print e
             self.next_img.clear()
 
     def zoom_in(self):
-        print "zoom_in"
+        # print "zoom_in"
         self.current_img.zoom_level *= 1.3
         self.actions["zoom fit"].setChecked(False)
 
     def zoom_out(self):
-        print "zoom_out"
+        # print "zoom_out"
         self.current_img.zoom_level /= 1.3
         self.actions["zoom fit"].setChecked(False)
 

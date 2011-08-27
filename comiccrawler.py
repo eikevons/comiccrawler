@@ -36,7 +36,7 @@ class StripSiteBase(object):
         self.title = title
 
     def __str__(self):
-        return "<%s %s>" % (self.comicname, self.url)
+        return "<{s.comicname} {s.url} prev:{s.prev} next:{s.next}>".format(s=self)
 
     @classmethod
     def mkFromResponse(cls, resp):
@@ -221,42 +221,43 @@ class ComicCrawler(dict):
             raise ValueError("direction must be 'prev' or 'next'")
         self._current_url = site.url
 
-    # TODO: This is not working well with ImageViewer.{first,last}_strip
     def get(self, dist=0, reload=True):
         """Get a strip `dist` clicks away from current strip.
 
         If `reload` is ``True`` refetch the intermediate sites if necessary.
         """
-        t = self[self._current_url]
+        buf = self[self._current_url]
         while dist != 0:
             if dist > 0:
-                if t.next is TerminusSite:
-                    print "next == TerminusSite  => reloading"
-                    self.update_strip(t.url)
-                    t = self[t.url]
-                if t.next is None:
+                if buf.next is TerminusSite:
+                    # print "next == TerminusSite => reloading"
+                    self.update_strip(buf.url)
+                    buf = self[buf.url]
+                if buf.next is None:
                     raise StripError("No next site")
 
-                if not reload and not self.has_key(t.next):
+                # Prevent auto-reload of strip site.
+                if not reload and not self.has_key(buf.next):
                     raise StripError("Next strip not loaded")
 
-                t = self[t.next]
+                buf = self[buf.next]
                 dist -= 1
 
             elif dist < 0:
-                if t.prev is TerminusSite:
-                    print "prev == TerminusSite  => reloading"
-                    self.update_strip(t.url)
-                    t = self[t.url]
-                if t.prev is None:
+                if buf.prev is TerminusSite:
+                    # print "prev == TerminusSite  => reloading"
+                    self.update_strip(buf.url)
+                    buf = self[buf.url]
+                if buf.prev is None:
                     raise StripError("No prev site")
 
-                if not reload and not self.has_key(t.prev):
+                # Prevent auto-reload of strip site.
+                if not reload and not self.has_key(buf.prev):
                     raise StripError("Previous strip not loaded")
 
-                t = self[t.prev]
+                buf = self[buf.prev]
                 dist += 1
-        return t
+        return buf
 
     def _add_strip(self, strip):
         self[strip.url] = strip
@@ -264,7 +265,7 @@ class ComicCrawler(dict):
     def get_image(self, strip):
         # Prepare save directory
         if not os.path.exists(self.savedir):
-            print "Creating savedir"
+            # print "Creating savedir"
             os.makedirs(self.savedir)
         elif not os.path.isdir(self.savedir):
             raise IOError("Output directory '%s' is not a directory" % self.savedir)
@@ -275,8 +276,8 @@ class ComicCrawler(dict):
             print "Downloading %s to %s" % (strip.img, target)
             image = urllib.URLopener()
             image.retrieve(strip.img, target)
-        else:
-            print "Image for %s already downloaded %s" % (strip.img, target)
+        # else:
+            # print "Image for %s already downloaded %s" % (strip.img, target)
         return target
 
     @property
