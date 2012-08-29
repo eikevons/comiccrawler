@@ -1,3 +1,4 @@
+import logging
 import mechanize
 import urllib
 from urlparse import urlsplit
@@ -206,7 +207,7 @@ class ComicCrawler(dict):
         return "<ComicCrawler for %s %d entries>" % (self.stripsite.__name__, len(self))
 
     def update_strip(self, url):
-        print "Loading", url
+        logging.info("Loading {0}".format(url))
         resp = self.browser.open(url)
         strip = self.stripsite.mkFromResponse(resp)
         self._add_strip(strip)
@@ -230,7 +231,7 @@ class ComicCrawler(dict):
         while dist != 0:
             if dist > 0:
                 if buf.next is TerminusSite:
-                    # print "next == TerminusSite => reloading"
+                    logging.debug("next == TerminusSite -> reloading")
                     self.update_strip(buf.url)
                     buf = self[buf.url]
                 if buf.next is None:
@@ -245,7 +246,7 @@ class ComicCrawler(dict):
 
             elif dist < 0:
                 if buf.prev is TerminusSite:
-                    # print "prev == TerminusSite  => reloading"
+                    logging.debug("next == TerminusSite -> reloading")
                     self.update_strip(buf.url)
                     buf = self[buf.url]
                 if buf.prev is None:
@@ -265,7 +266,7 @@ class ComicCrawler(dict):
     def get_image(self, strip):
         # Prepare save directory
         if not os.path.exists(self.savedir):
-            # print "Creating savedir"
+            logging.info("Creating cache directory {0}".format(self.savedir))
             os.makedirs(self.savedir)
         elif not os.path.isdir(self.savedir):
             raise IOError("Output directory '%s' is not a directory" % self.savedir)
@@ -273,11 +274,11 @@ class ComicCrawler(dict):
         target = os.path.join(self.savedir, strip.savename)
 
         if not os.path.exists(target):
-            print "Downloading %s to %s" % (strip.img, target)
+            logging.info("Downloading {0} to {1}".format(strip.img, target))
             image = urllib.URLopener()
             image.retrieve(strip.img, target)
-        # else:
-            # print "Image for %s already downloaded %s" % (strip.img, target)
+        else:
+            logging.debug("Image for url {0} already downloaded at {1}".format(strip.img, target))
         return target
 
     @property
