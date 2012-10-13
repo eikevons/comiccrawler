@@ -69,8 +69,6 @@ class ImageWidget(QtGui.QScrollArea):
         if self.image.pixmap():
             self.image.resize(self.zoom_level * self.image.pixmap().size())
 
-    # zoom_level = property(get_zoom_level, set_zoom_level)
-
     @property
     def pixmap(self):
         return self.image.pixmap()
@@ -84,6 +82,7 @@ class ClickableLabel(QtGui.QLabel):
 
 
 class ImageViewer(QtGui.QMainWindow):
+    zoom_increment = 1.1
     def __init__(self, stripsites):
         super(ImageViewer, self).__init__()
 
@@ -159,8 +158,6 @@ class ImageViewer(QtGui.QMainWindow):
 
         # Zoom actions
         act = QtGui.QAction("Zoom in", self)
-        # zoomin.setShortcut("Ctrl++")
-        # zoomin.setShortcut("+")
         act.setShortcut("=")
         # act.setEnabled(False)
         self.connect(act, QtCore.SIGNAL("triggered()"), self.zoom_in)
@@ -171,6 +168,11 @@ class ImageViewer(QtGui.QMainWindow):
         # act.setEnabled(False)
         self.connect(act, QtCore.SIGNAL("triggered()"), self.zoom_out)
         self.actions["zoom out"] = act
+
+        act = QtGui.QAction("Reset Zoom", self)
+        act.setShortcut("0")
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.zoom_reset)
+        self.actions["zoom reset"] = act
 
         act = QtGui.QAction("Fit image", self)
         act.setShortcut("x")
@@ -217,6 +219,7 @@ class ImageViewer(QtGui.QMainWindow):
         mi = menubar.addMenu("&Zoom")
         mi.addAction(self.actions["zoom in"])
         mi.addAction(self.actions["zoom out"])
+        mi.addAction(self.actions["zoom reset"])
         mi.addAction(self.actions["zoom fit"])
 
     def on_aboutToQuit(self):
@@ -307,13 +310,18 @@ class ImageViewer(QtGui.QMainWindow):
             self.next_img.clear()
 
     def zoom_in(self):
-        self.current_img.zoom_level *= 1.3
+        self.current_img.zoom_level *= self.zoom_increment
         logging.debug("zoom_in: level {0}".format(self.current_img.zoom_level))
         self.actions["zoom fit"].setChecked(False)
 
     def zoom_out(self):
-        self.current_img.zoom_level /= 1.3
+        self.current_img.zoom_level /= self.zoom_increment
         logging.debug("zoom_out: level {0}".format(self.current_img.zoom_level))
+        self.actions["zoom fit"].setChecked(False)
+
+    def zoom_reset(self):
+        self.current_img.zoom_level = 1.0
+        logging.debug("zoom_reset: level {0}".format(self.current_img.zoom_level))
         self.actions["zoom fit"].setChecked(False)
 
     def zoom_fit(self):
