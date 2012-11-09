@@ -69,6 +69,8 @@ class ImageWidget(QtGui.QScrollArea):
         if self.image.pixmap():
             self.image.resize(self.zoom_level * self.image.pixmap().size())
 
+    # zoom_level = property(get_zoom_level, set_zoom_level)
+
     @property
     def pixmap(self):
         return self.image.pixmap()
@@ -82,9 +84,9 @@ class ClickableLabel(QtGui.QLabel):
 
 
 class ImageViewer(QtGui.QMainWindow):
-    zoom_increment = 1.1
-    def __init__(self, stripsites):
+    def __init__(self, app, stripsites):
         super(ImageViewer, self).__init__()
+        self.app = app
 
         self.stripsites = stripsites
         self.comic = None
@@ -126,6 +128,12 @@ class ImageViewer(QtGui.QMainWindow):
         act.setStatusTip("Exit application")
         self.connect(act, QtCore.SIGNAL("triggered()"), QtCore.SLOT("close()"))
         self.actions["exit"] = act
+
+        act = QtGui.QAction("Copy path", self)
+        act.setShortcut("y")
+        act.setStatusTip("Copy image path to clipboard")
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.yank_file_name)
+        self.actions["yank"] = act
 
         # Label actions
         self.connect(self.prev_img, QtCore.SIGNAL("clicked()"), self.previous_strip)
@@ -169,11 +177,6 @@ class ImageViewer(QtGui.QMainWindow):
         self.connect(act, QtCore.SIGNAL("triggered()"), self.zoom_out)
         self.actions["zoom out"] = act
 
-        act = QtGui.QAction("Reset Zoom", self)
-        act.setShortcut("0")
-        self.connect(act, QtCore.SIGNAL("triggered()"), self.zoom_reset)
-        self.actions["zoom reset"] = act
-
         act = QtGui.QAction("Fit image", self)
         act.setShortcut("x")
         act.setCheckable(True)
@@ -181,6 +184,12 @@ class ImageViewer(QtGui.QMainWindow):
         self.current_img.zoom_level = "fit"
         self.connect(act, QtCore.SIGNAL("triggered()"), self.zoom_fit)
         self.actions["zoom fit"] = act
+
+        act = QtGui.QAction("No zoom", self)
+        act.setShortcut("0")
+        # act.setEnabled(False)
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.zoom_none)
+        self.actions["zoom none"] = act
 
         # List with comics
         group = QtGui.QActionGroup(self, exclusive=True, triggered=self.change_comic)
@@ -205,6 +214,8 @@ class ImageViewer(QtGui.QMainWindow):
 
         # Comic menu
         mi = menubar.addMenu("&Comic")
+        mi.addAction(self.actions["yank"])
+        mi.addSeparator()
         mi.addAction(self.actions["strip previous"])
         mi.addAction(self.actions["strip next"])
         mi.addAction(self.actions["strip first"])
@@ -219,8 +230,8 @@ class ImageViewer(QtGui.QMainWindow):
         mi = menubar.addMenu("&Zoom")
         mi.addAction(self.actions["zoom in"])
         mi.addAction(self.actions["zoom out"])
-        mi.addAction(self.actions["zoom reset"])
         mi.addAction(self.actions["zoom fit"])
+        mi.addAction(self.actions["zoom none"])
 
     def on_aboutToQuit(self):
         # Dump the current comic's index.
@@ -285,6 +296,13 @@ class ImageViewer(QtGui.QMainWindow):
                 logging.error("Failed to load index: {0}".format(err))
             self.update_images()
 
+    def yank_file_name(self):
+        current_strip = self.comic.get()
+        file_name = self.comic.get_image(current_strip)
+        cb = self.app.clipboard()
+        logging.debug("Copying file name to clipboard: %s" % file_name)
+        cb.setText(file_name)
+
     def update_images(self):
         current_strip = self.comic.get()
         logging.info("Current strip {0}".format(current_strip))
@@ -310,30 +328,26 @@ class ImageViewer(QtGui.QMainWindow):
             self.next_img.clear()
 
     def zoom_in(self):
-        self.current_img.zoom_level *= self.zoom_increment
+        self.current_img.zoom_level *= 1.3
         logging.debug("zoom_in: level {0}".format(self.current_img.zoom_level))
         self.actions["zoom fit"].setChecked(False)
 
     def zoom_out(self):
-        self.current_img.zoom_level /= self.zoom_increment
+        self.current_img.zoom_level /= 1.3
         logging.debug("zoom_out: level {0}".format(self.current_img.zoom_level))
-        self.actions["zoom fit"].setChecked(False)
-
-    def zoom_reset(self):
-        self.current_img.zoom_level = 1.0
-        logging.debug("zoom_reset: level {0}".format(self.current_img.zoom_level))
         self.actions["zoom fit"].setChecked(False)
 
     def zoom_fit(self):
         if self.actions["zoom fit"].isChecked():
             self.current_img.zoom_level = "fit"
-            # self.actions["zoom in"].setEnabled(False)
-            # self.actions["zoom out"].setEnabled(False)
         else:
-            # Copy the numerical zoom level
+            # Copy the numerical zoom level to reset the zoom_level
             self.current_img.zoom_level = self.current_img.zoom_level
-            # self.actions["zoom in"].setEnabled(True)
-            # self.actions["zoom out"].setEnabled(True)
+
+    def zoom_none(self):
+        self.current_img.zoom_level = 1.0
+        logging.debug("zoom_none: level {0}".format(self.current_img.zoom_level))
+        self.actions["zoom fit"].setChecked(False)
 
 
 
@@ -359,7 +373,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=opts.LOGLEVEL, format="%(levelname)s %(message)s")
 
     app = QtGui.QApplication(sys.argv)
-    iv = ImageViewer(comiccrawler.comics)
+    iv = ImageViewer(app, comiccrawler.comics)
     app.connect(app, QtCore.SIGNAL("aboutToQuit()"), iv.on_aboutToQuit)
 
     iv.show()
