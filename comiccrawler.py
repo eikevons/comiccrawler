@@ -29,6 +29,7 @@ class StripError(StandardError):
 class StripSiteBase(object):
     comicname = NotImplemented
     baseurl = NotImplemented
+    extension = ""
 
     def __init__(self, siteurl, imgurl, prevurl, nexturl, title=None):
         self.url = siteurl
@@ -46,7 +47,7 @@ class StripSiteBase(object):
 
     @property
     def savename(self):
-        return md5(self.img).hexdigest()
+        return md5(self.img).hexdigest() + self.extension
 
     @staticmethod
     def _absolute_url(base, anchor=None, img=None):
@@ -61,6 +62,7 @@ class StripSiteBase(object):
 class IncidentalComics(StripSiteBase):
     comicname = "Incidental Comics"
     baseurl = "http://www.gocomics.com/incidentalcomics/"
+    extension = ".gif"
 
     @classmethod
     def mkFromResponse(cls, resp):
@@ -123,6 +125,7 @@ class XKCD(StripSiteBase):
 class Dilbert(StripSiteBase):
     comicname = "Dilbert"
     baseurl = "http://www.dilbert.com/"
+    extension = ".gif"
 
     @classmethod
     def mkFromResponse(cls, resp):
