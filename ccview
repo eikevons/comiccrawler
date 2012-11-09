@@ -133,7 +133,13 @@ class ImageViewer(QtGui.QMainWindow):
         act.setShortcut("y")
         act.setStatusTip("Copy image path to clipboard")
         self.connect(act, QtCore.SIGNAL("triggered()"), self.yank_file_name)
-        self.actions["yank"] = act
+        self.actions["yank path"] = act
+
+        act = QtGui.QAction("Copy URL", self)
+        act.setShortcut("u")
+        act.setStatusTip("Copy clip's URL to clipboard")
+        self.connect(act, QtCore.SIGNAL("triggered()"), self.yank_current_url)
+        self.actions["yank url"] = act
 
         # Label actions
         self.connect(self.prev_img, QtCore.SIGNAL("clicked()"), self.previous_strip)
@@ -214,7 +220,8 @@ class ImageViewer(QtGui.QMainWindow):
 
         # Comic menu
         mi = menubar.addMenu("&Comic")
-        mi.addAction(self.actions["yank"])
+        mi.addAction(self.actions["yank path"])
+        mi.addAction(self.actions["yank url"])
         mi.addSeparator()
         mi.addAction(self.actions["strip previous"])
         mi.addAction(self.actions["strip next"])
@@ -302,6 +309,12 @@ class ImageViewer(QtGui.QMainWindow):
         cb = self.app.clipboard()
         logging.debug("Copying file name to clipboard: %s" % file_name)
         cb.setText(file_name)
+
+    def yank_current_url(self):
+        url = self.comic.get().url
+        cb = self.app.clipboard()
+        logging.debug("Copying current clip's url to clipboard: %s" % url)
+        cb.setText(url)
 
     def update_images(self):
         current_strip = self.comic.get()
