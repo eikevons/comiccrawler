@@ -9,11 +9,12 @@ from BeautifulSoup import BeautifulSoup
 
 
 # Some sentinel values.
-class TerminusSite(object):
-    """Sentinel value to indicate that the next/previous site has not been
-    loaded.
-    """
-    pass
+terminus_site = object()
+# class TerminusSite(object):
+    # """Sentinel value to indicate that the next/previous site has not been
+    # loaded.
+    # """
+    # pass
 
 
 class ParsingError(StandardError):
@@ -230,8 +231,8 @@ class ComicCrawler(dict):
         buf = self[self._current_url]
         while dist != 0:
             if dist > 0:
-                if buf.next is TerminusSite:
-                    logging.debug("next == TerminusSite -> reloading")
+                if buf.next is terminus_site:
+                    logging.debug("next == terminus_site -> reloading")
                     self.update_strip(buf.url)
                     buf = self[buf.url]
                 if buf.next is None:
@@ -245,8 +246,8 @@ class ComicCrawler(dict):
                 dist -= 1
 
             elif dist < 0:
-                if buf.prev is TerminusSite:
-                    logging.debug("next == TerminusSite -> reloading")
+                if buf.prev is terminus_site:
+                    logging.debug("next == terminus_site -> reloading")
                     self.update_strip(buf.url)
                     buf = self[buf.url]
                 if buf.prev is None:
@@ -295,14 +296,14 @@ class ComicCrawler(dict):
         with open(infile, "r") as f:
             # data = [line.strip().split(sep) for line in f]
             data = [SafeTokenizer(line.strip(), sep) for line in f]
-        strip = self.stripsite(data[0][0], data[0][1], data[1][0], TerminusSite, data[0][2])
+        strip = self.stripsite(data[0][0], data[0][1], data[1][0], terminus_site, data[0][2])
         self._add_strip(strip)
         self._current_url = data[0][0]
         for i, toks in enumerate(data[1:-1]):
             i += 1
             strip = self.stripsite(toks[0], toks[1], data[i+1][0], data[i-1][0], toks[2])
             self._add_strip(strip)
-        strip = self.stripsite(data[-1][0], data[-1][1], TerminusSite, data[-2][0], data[-1][2])
+        strip = self.stripsite(data[-1][0], data[-1][1], terminus_site, data[-2][0], data[-1][2])
         self._add_strip(strip)
 
     def dump_index(self, outfile=None, sep="\t"):
